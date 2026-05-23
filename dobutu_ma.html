@@ -485,6 +485,33 @@
 
 
 
+
+
+  /* ===== ROUND / WIND STATUS ===== */
+  .round-panel {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 4px auto 8px;
+    padding: 0 16px;
+  }
+  .round-chip {
+    background: #fffaf0;
+    border: 2px solid var(--honey);
+    border-radius: 18px;
+    padding: 5px 13px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    color: var(--brown);
+    box-shadow: 2px 2px 0 rgba(232,168,53,0.35);
+  }
+  .round-chip .val {
+    color: var(--terracotta);
+    font-size: 0.98rem;
+    margin-left: 3px;
+  }
+
   /* compact status for table layout */
   .hint-area, .tenpai-bar, .yaku-panel { max-width: 760px; margin-left: auto; margin-right: auto; }
 
@@ -608,6 +635,13 @@
   <div class="score-chip">🏅 和了 <span class="val" id="winCount">0</span>回</div>
 </div>
 
+<!-- Round / Wind -->
+<div class="round-panel" id="roundPanel">
+  <div class="round-chip">🌬️ 場風 <span class="val" id="roundWindVal">東</span></div>
+  <div class="round-chip">📍 局 <span class="val" id="kyokuVal">1局</span></div>
+  <div class="round-chip">🙋 自風 <span class="val" id="playerWindVal">東</span></div>
+</div>
+
 <!-- Hidden/compact status areas needed by the game logic -->
 <div class="hint-area" id="hintArea"></div>
 <div class="tenpai-bar normal" id="tenpaiBar">— 手牌を整えてテンパイを目指そう —</div>
@@ -708,6 +742,35 @@ let tsumoCount = 0;
 let winCount = 0;
 let gameActive = false;
 let lastHint = '';
+let roundWindIndex = 0; // 0=東場, 1=南場, 2=西場, 3=北場
+let kyokuNumber = 1;   // 1〜4局
+let hasStartedOnce = false;
+const WIND_CHARS = ['東','南','西','北'];
+const SEAT_NAMES = ['あなた','うさぎさん','コアラ席','かめ席'];
+
+function getPlayerWind() {
+  // ざっくり親が時計回りに移る想定：東1=東、東2=北、東3=西、東4=南
+  const windsByKyoku = ['東','北','西','南'];
+  return windsByKyoku[(kyokuNumber - 1) % 4];
+}
+
+function advanceRoundCounter() {
+  kyokuNumber++;
+  if (kyokuNumber > 4) {
+    kyokuNumber = 1;
+    roundWindIndex = (roundWindIndex + 1) % WIND_CHARS.length;
+  }
+}
+
+function renderRoundInfo() {
+  const rw = document.getElementById('roundWindVal');
+  const ky = document.getElementById('kyokuVal');
+  const pw = document.getElementById('playerWindVal');
+  if (rw) rw.textContent = WIND_CHARS[roundWindIndex];
+  if (ky) ky.textContent = `${kyokuNumber}局`;
+  if (pw) pw.textContent = getPlayerWind();
+}
+
 
 // Teachers roster
 const teachers = [
@@ -1361,6 +1424,15 @@ var cpuPlayers = [
 var currentTurnName = 'あなた';
 var cpuThinking = false;
 
+
+function getCpuWind(index) {
+  const playerWind = getPlayerWind();
+  const order = ['東','南','西','北'];
+  const p = order.indexOf(playerWind);
+  // 左・上・右の順に、下家・対面・上家っぽく表示
+  return order[(p + index + 1) % 4];
+}
+
 function renderCpuTable(activeIndex = -1) {
   const slots = [
     document.getElementById('cpuLeft'),   // 下家っぽい左
@@ -1376,7 +1448,7 @@ function renderCpuTable(activeIndex = -1) {
     card.className = 'seat-card' + (i === activeIndex ? ' active' : '');
     const name = document.createElement('div');
     name.className = 'cpu-name';
-    name.textContent = `${cpu.char} ${cpu.name}`;
+    name.textContent = `${cpu.char} ${cpu.name}（${getCpuWind(i)}）`;
     const status = document.createElement('div');
     status.className = 'cpu-status';
     status.textContent = `${cpu.note} / 手牌${cpu.hand.length}枚 / 捨て牌${cpu.discards.length}枚`;
@@ -1393,6 +1465,9 @@ function renderCpuTable(activeIndex = -1) {
 }
 
 function dealHand() {
+  if (hasStartedOnce) advanceRoundCounter();
+  hasStartedOnce = true;
+  renderRoundInfo();
   wall = buildWall();
   hand = [];
   discards = [];
@@ -1422,7 +1497,7 @@ function dealHand() {
   renderDiscards();
   renderCpuTable();
   updateWallInfo();
-  setMsg('どうぶつ3匹が卓についたよ！まず1枚選んで「捨てる」。CPUのあと、自動でツモってあなたの番に戻るよ。');
+  setMsg(`${WIND_CHARS[roundWindIndex]}${kyokuNumber}局、あなたは${getPlayerWind()}だよ。まず1枚選んで「捨てる」。CPUのあと、自動でツモって戻るよ。`);
   checkYaku();
 }
 
@@ -1668,6 +1743,7 @@ function updateWallInfo() {
 }
 
 // ===== INIT =====
+renderRoundInfo();
 setMsg('ようこそ〜！「配牌する」を押すと14枚配るよ。捨てたい牌をクリックして「捨てる」ボタンで捨てよう！');
 </script>
 </body>
